@@ -1,52 +1,56 @@
-# Project Title
+# ACI to Apstra Converter
 
-A brief description of your project.
+A tool for converting an ACI APIC configuration to an Apstra configuration, outputted as a Terraform configuration.
 
 ## Getting Started
 
-Instructions to get the project up and running on your local machine.
+These instructions will help you set up and run the project on your local machine.
 
 ## Prerequisites
 
-What things you need to install and how to install them.
+You need to have the following installed:
+- Python 3.x
+- Required Python packages (listed in `requirements.txt`)
 
 ## Installing
 
-Step-by-step guide to get the development environment running.
+Follow these steps to set up the development environment:
 
-## Running the Tests
+1. **Clone the repository**:
+    ```bash
+    git clone https://github.com/yourusername/aci-to-apstra.git
+    cd aci-to-apstra
+    ```
 
-Explain how to run the automated tests for this system.
+2. **Install the required packages**:
+    ```bash
+    pip install -r requirements.txt
+    ```
+
+## Running the Project
+
+To run the project, the user must download the APIC configuration JSON file directly from the APIC appliance.
+
+Once the APIC config JSON is downloaded, run the following command:
+```bash
+python3 src/main.py
+```
 
 ## Deployment
 
-Additional notes about how to deploy this on a live system.
+Additional notes on how to deploy this project on a live system will be provided here.
 
 ## Built With
 
-- [Tool/Framework](https://example.com) - Description
-- [Another Tool](https://example.com) - Description
-
-## Contributing
-
-Guidelines for contributing to the project.
-
-## Versioning
-
-Explanation of the versioning scheme.
+* Python - The main programming language used
+* Jinja2 - Template engine for Python
+* Terraform - Infrastructure as Code tool
 
 ## Authors
 
-- **Your Name** - *Initial work* - [YourWebsite](https://example.com)
+* Adam Jarvis
+* Mohamed Abouzeina
 
 ## License
 
-This project is licensed under the [License Name] License - see the LICENSE file for details.
-
-## Acknowledgments
-
-- Hat tip to anyone whose code was used
-- Inspiration
-- etc
-
-
+This project is licensed under the MIT License - see the LICENSE file for details.

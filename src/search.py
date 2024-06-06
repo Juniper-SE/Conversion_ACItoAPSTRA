@@ -27,11 +27,8 @@ def tennant_search(data):
     vritual_network_list=[]
     # Print the results
     for tennant in data:
-        # print(f"Path: {result['path']}")
-        # print(f"Children: {json.dumps(result, indent=2)}")
-        # print(json.dumps(result))
-        tennant_list.append(tennant["attributes"]["name"])
 
+        tennant_list.append(tennant["attributes"]["name"])
         keys_to_find = ["fvCtx"]
         tennant_vrf = search_json(tennant, keys_to_find) 
         for vrf in tennant_vrf:
@@ -64,9 +61,7 @@ def tennant_search(data):
 
                 if vn_child_temp_data:
                     vn_temp_data["children"].append(dict(vn_child_temp_data))
-
-                # print(vn_child_temp_data)
-            
+                    
             vritual_network_list.append(vn_temp_data)
 
     return vrf_list,vritual_network_list
