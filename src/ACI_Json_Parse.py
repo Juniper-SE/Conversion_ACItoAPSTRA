@@ -15,8 +15,7 @@ def search_json(data, keys_to_find, path=""):
                 results.append({
                     "path": current_path,
                     "attributes": value.get("attributes", []),
-                    "children": value.get("children", [])
-                    
+                    "children": value.get("children", [])                    
                 })
             results.extend(search_json(value, keys_to_find, current_path))
     elif isinstance(data, list):
