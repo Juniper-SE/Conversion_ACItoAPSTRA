@@ -1,0 +1,9 @@
+node_modules/
+*.log
+.env
+__pycache__/
+*.py[cod]
+.DS_Store
+*.swp
+.vscode/
+
