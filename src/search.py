@@ -52,7 +52,7 @@ def tennant_search(data):
             for child_vn in vrf["children"]:
                 vn_child_temp_data = {}
                 if "fvRsCtx" in child_vn:
-                    vn_child_temp_data["vn_vrf_bind"] = child_vn["fvRsCtx"]["attributes"]["tnFvCtxName"]
+                    vn_temp_data["vn_vrf_bind"] = tennant["attributes"]["name"] + "_" + child_vn["fvRsCtx"]["attributes"]["tnFvCtxName"]
                 if vrf["attributes"]["unicastRoute"] == "yes":
                     if "fvSubnet" in child_vn:
                         vn_child_temp_data["aci_ip"] = child_vn["fvSubnet"]["attributes"]["ip"]

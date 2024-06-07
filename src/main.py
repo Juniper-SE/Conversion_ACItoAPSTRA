@@ -74,7 +74,10 @@ def main():
     """Main function to load data and perform tenant search."""
     parser = argparse.ArgumentParser(description="ACI to Apstra Converter")
     parser.add_argument('--file', '-f', type=str, required=True, help='Path to the APIC configuration JSON file')
+    parser.add_argument('--blueprint_id', '-b', type=str, required=True, help='Blueprint ID needed for Terraform Config file.')
+    parser.add_argument('--output', '-o', type=str, required=True, help='Output directory for Terraform Config file.')
     parser.add_argument('--test', '-t', action='store_true', help='Run the script in test mode')
+    
     
 
     args = parser.parse_args()
@@ -89,7 +92,11 @@ def main():
     try:
         apic_data = data_load(args.file)
         vrf_list, virtual_network_list = tenant_search(apic_data)
-        # config = jinja.generate_apstra_datacenter_routing_zone_config(vrf_list)
+        tf_path=utils.create_directory(args.output)
+        vrf_config = jinja.generate_apstra_datacenter_routing_zone_config(vrf_list, args.blueprint_id)
+        utils.create_file(tf_path, "vrf.tf", content=vrf_config)
+        vn_config = jinja.generate_apstra_datacenter_virtual_network_config(virtual_network_list, args.blueprint_id)
+        utils.create_file(tf_path, "vn.tf", content=vn_config)
 
         aci_bindings_with_ports=port_search(apic_data)
 

@@ -1,6 +1,7 @@
 import json
 import ipaddress
 import os
+import logging
 
 def get_ip_and_network(cidr):
     try:
@@ -86,3 +87,44 @@ def get_data_test_file(filename):
     
     # Read the contents of the file
     return data_file_path
+
+
+def setup_logging(log_file='app_errors.log'):
+    """Set up logging to only show errors."""
+    logging.basicConfig(
+        filename=log_file,  # Log file name
+        level=logging.ERROR,  # Log level (only log errors and above)
+        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',  # Log message format
+        datefmt='%Y-%m-%d %H:%M:%S'  # Date format
+    )
+    logger = logging.getLogger(__name__)
+    return logger
+
+def create_directory(path):
+    """Create a directory called 'tf' within the provided path."""
+    logger = setup_logging()
+    tf_path = os.path.join(path, 'tf')
+    
+    try:
+        if not os.path.exists(tf_path):
+            os.makedirs(tf_path)
+            logger.info(f"Directory created at: {tf_path}")  # This won't be logged due to the logging level set to ERROR
+        else:
+            logger.warning(f"Directory already exists at: {tf_path}")  # This won't be logged due to the logging level set to ERROR
+    except Exception as e:
+        logger.error(f"Failed to create directory: {tf_path} - {e}")
+        raise
+    return tf_path
+
+def create_file(directory, filename, content=""):
+    """Create a file with the given content in the specified directory."""
+    logger = setup_logging()
+    
+    try:
+        file_path = os.path.join(directory, filename)
+        with open(file_path, 'w') as file:
+            file.write(content)
+        logger.info(f"File created at: {file_path}")  # This won't be logged due to the logging level set to ERROR
+    except Exception as e:
+        logger.error(f"Failed to create file: {file_path} - {e}")
+        raise
