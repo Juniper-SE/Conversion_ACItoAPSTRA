@@ -47,6 +47,7 @@ def generate_apstra_datacenter_virtual_network_config(data, blueprint_id):
         }
       }
     }
+    {% endfor %}
     """
 
     # Load the template from the string
