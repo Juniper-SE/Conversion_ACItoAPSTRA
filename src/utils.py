@@ -8,7 +8,7 @@ def get_ip_and_network(cidr):
         # Parse the IP network from the CIDR notation
         network = ipaddress.IPv4Network(cidr, strict=False)
         # Get the IP address part
-        ip_address = str(network.network_address + (1 << (32 - network.prefixlen)) - 1)
+        ip_address= ipaddress.ip_interface(cidr)
         # Get the network address with subnet mask
         network_address = str(network.network_address)
         subnet_mask = str(network.netmask)
