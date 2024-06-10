@@ -37,9 +37,6 @@ def tennant_search(data):
             vrf_tmp["aci_vrf"] = vrf["attributes"]["name"]
             vrf_tmp["apstra_vrf"] = tennant["attributes"]["name"] + "_" + vrf["attributes"]["name"]
             vrf_list.append(vrf_tmp)
-
-
-
         keys_to_find = ["fvBD"]
         tennant_vrf = search_json(tennant, keys_to_find) 
         for vrf in tennant_vrf:
@@ -48,7 +45,10 @@ def tennant_search(data):
             vn_temp_data["vn_name"] = vrf["attributes"]["name"]
             vn_temp_data["vn_mac"] = vrf["attributes"]["mac"]
             vn_temp_data["vn_unicastRoute"] = vrf["attributes"]["unicastRoute"]
-
+            if vn_temp_data["vn_unicastRoute"] == "yes":
+                vn_temp_data["vn_unicastRoute"] = "true"
+            elif vn_temp_data["vn_unicastRoute"] == "no":
+                vn_temp_data["vn_unicastRoute"] = "false"
             for child_vn in vrf["children"]:
                 vn_child_temp_data = {}
                 if "fvRsCtx" in child_vn:
