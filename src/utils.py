@@ -9,6 +9,8 @@ def get_ip_and_network(cidr):
         network = ipaddress.IPv4Network(cidr, strict=False)
         # Get the IP address part
         ip_address= ipaddress.ip_interface(cidr)
+        ip_address = ip_address.ip
+        ip_address= str(ip_address)
         # Get the network address with subnet mask
         network_address = str(network.network_address)
         subnet_mask = str(network.netmask)
@@ -111,6 +113,81 @@ def create_directory(path):
             logger.info(f"Directory created at: {tf_path}")  # This won't be logged due to the logging level set to ERROR
         else:
             logger.warning(f"Directory already exists at: {tf_path}")  # This won't be logged due to the logging level set to ERROR
+    except Exception as e:
+        logger.error(f"Failed to create directory: {tf_path} - {e}")
+        raise
+    return tf_path
+
+
+def create_directory_part1(path):
+    """Create a directory called 'tf' within the provided path."""
+    logger = setup_logging()
+    tf_path = os.path.join(path, 'tf/part1')
+
+    try:
+        if not os.path.exists(tf_path):
+            os.makedirs(tf_path)
+            logger.info(
+                f"Directory created at: {tf_path}")  # This won't be logged due to the logging level set to ERROR
+        else:
+            logger.warning(
+                f"Directory already exists at: {tf_path}")  # This won't be logged due to the logging level set to ERROR
+    except Exception as e:
+        logger.error(f"Failed to create directory: {tf_path} - {e}")
+        raise
+    return tf_path
+
+
+def create_directory_part2(path):
+    """Create a directory called 'tf' within the provided path."""
+    logger = setup_logging()
+    tf_path = os.path.join(path, 'tf/part2')
+
+    try:
+        if not os.path.exists(tf_path):
+            os.makedirs(tf_path)
+            logger.info(
+                f"Directory created at: {tf_path}")  # This won't be logged due to the logging level set to ERROR
+        else:
+            logger.warning(
+                f"Directory already exists at: {tf_path}")  # This won't be logged due to the logging level set to ERROR
+    except Exception as e:
+        logger.error(f"Failed to create directory: {tf_path} - {e}")
+        raise
+    return tf_path
+
+
+def create_directory_part3(path):
+    """Create a directory called 'tf' within the provided path."""
+    logger = setup_logging()
+    tf_path = os.path.join(path, 'tf/part3')
+
+    try:
+        if not os.path.exists(tf_path):
+            os.makedirs(tf_path)
+            logger.info(
+                f"Directory created at: {tf_path}")  # This won't be logged due to the logging level set to ERROR
+        else:
+            logger.warning(
+                f"Directory already exists at: {tf_path}")  # This won't be logged due to the logging level set to ERROR
+    except Exception as e:
+        logger.error(f"Failed to create directory: {tf_path} - {e}")
+        raise
+    return tf_path
+
+def create_directory_part4(path):
+    """Create a directory called 'tf' within the provided path."""
+    logger = setup_logging()
+    tf_path = os.path.join(path, 'tf/part4')
+
+    try:
+        if not os.path.exists(tf_path):
+            os.makedirs(tf_path)
+            logger.info(
+                f"Directory created at: {tf_path}")  # This won't be logged due to the logging level set to ERROR
+        else:
+            logger.warning(
+                f"Directory already exists at: {tf_path}")  # This won't be logged due to the logging level set to ERROR
     except Exception as e:
         logger.error(f"Failed to create directory: {tf_path} - {e}")
         raise
