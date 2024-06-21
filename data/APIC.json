@@ -19947,22 +19947,6 @@
                                         }
                                     },
                                     {
-                                        "fvSubnet": {
-                                            "attributes": {
-                                                "annotation": "",
-                                                "ctrl": "nd",
-                                                "descr": "",
-                                                "dn": "",
-                                                "ip": "10.99.44.1/24",
-                                                "name": "",
-                                                "nameAlias": "",
-                                                "preferred": "no",
-                                                "scope": "public",
-                                                "virtual": "no"
-                                            }
-                                        }
-                                    },
-                                    {
                                         "fvRsIgmpsn": {
                                             "attributes": {
                                                 "annotation": "",

@@ -1,5 +1,7 @@
 import utils
 import re
+import csv
+import json
 
 def search_json(data, keys_to_find, path=""):
     results = []
@@ -37,33 +39,34 @@ def tennant_search(data):
             vrf_tmp["aci_vrf"] = vrf["attributes"]["name"]
             vrf_tmp["apstra_vrf"] = tennant["attributes"]["name"] + "_" + vrf["attributes"]["name"]
             vrf_list.append(vrf_tmp)
-
-
-
         keys_to_find = ["fvBD"]
         tennant_vrf = search_json(tennant, keys_to_find) 
         for vrf in tennant_vrf:
             vn_temp_data = {}
             vn_temp_data["children"]=[]
-            vn_temp_data["vn_name"] = vrf["attributes"]["name"]
+            vn_temp_data["vn_name"] = tennant["attributes"]["name"] + "_" + vrf["attributes"]["name"]
             vn_temp_data["vn_mac"] = vrf["attributes"]["mac"]
             vn_temp_data["vn_unicastRoute"] = vrf["attributes"]["unicastRoute"]
-
+            if vn_temp_data["vn_unicastRoute"] == "yes":
+                vn_temp_data["vn_unicastRoute"] = "true"
+            elif vn_temp_data["vn_unicastRoute"] == "no":
+                vn_temp_data["vn_unicastRoute"] = "false"
             for child_vn in vrf["children"]:
                 vn_child_temp_data = {}
                 if "fvRsCtx" in child_vn:
-                    vn_temp_data["vn_vrf_bind"] = tennant["attributes"]["name"] + "_" + child_vn["fvRsCtx"]["attributes"]["tnFvCtxName"]
+                    if child_vn["fvRsCtx"]["attributes"]["tnFvCtxName"] != "":
+                        vn_temp_data["vn_vrf_bind"] = tennant["attributes"]["name"] + "_" + child_vn["fvRsCtx"]["attributes"]["tnFvCtxName"]
+                    else:
+                        vn_temp_data["vn_vrf_bind"] = "ignore_this_vn"
                 if vrf["attributes"]["unicastRoute"] == "yes":
                     if "fvSubnet" in child_vn:
                         vn_child_temp_data["aci_ip"] = child_vn["fvSubnet"]["attributes"]["ip"]
                         ip, network = utils.get_ip_and_network(child_vn["fvSubnet"]["attributes"]["ip"])
                         vn_child_temp_data["apstra_ip"] = ip
                         vn_child_temp_data["apstra_network"] = network
-
-                if vn_child_temp_data:
-                    vn_temp_data["children"].append(dict(vn_child_temp_data))
-                    
-            vritual_network_list.append(vn_temp_data)
+                        vn_temp_data["children"].append(dict(vn_child_temp_data))
+            if vn_temp_data["vn_vrf_bind"] != "ignore_this_vn":
+                vritual_network_list.append(vn_temp_data)
 
     return vrf_list,vritual_network_list
 
@@ -105,6 +108,7 @@ def port_binding(aci_bindings, nodes_with_interface_profiles, interface_profile_
                 entry['node2_ports'] = node2_ports
                 entry['port_speed'] = port_speed
                 entry['port_description'] = pg
+                entry['vn_tag_list'] = []
                 aci_bindings_with_ports[bd].append(entry.copy())
             elif 'paths-' in path:
                 if 'pathep-[eth1/' in path:
@@ -130,6 +134,7 @@ def port_binding(aci_bindings, nodes_with_interface_profiles, interface_profile_
                     port_speed = get_int_speed(data,node1,port)
                     entry['port_speed'] = port_speed
                     entry['port_description']= "Leaf_id_" + str(node1) + "_port_eth1_" + str(port)
+                    entry['vn_tag_list'] = []
                     aci_bindings_with_ports[bd].append(entry.copy())
                 elif 'pathep-[' in path:
                     x = re.findall("paths-.*/", path)
@@ -157,6 +162,7 @@ def port_binding(aci_bindings, nodes_with_interface_profiles, interface_profile_
                     entry['node2_ports'] = node2_ports
                     entry['port_speed'] = port_speed
                     entry['port_description'] = pg
+                    entry['vn_tag_list'] = []
                     aci_bindings_with_ports[bd].append(entry.copy())
 
     return aci_bindings_with_ports
@@ -167,8 +173,6 @@ def get_vrf_bd_bindings(aci_tenants):
     aci_bds=[]
     aci_bindings={}
     path_tuple={}
-
-
     for T in aci_tenants:
         aci_tenant_name = str(T['attributes']['name'])
         for child in T['children']:
@@ -209,6 +213,8 @@ def get_vrf_bd_bindings(aci_tenants):
                             for sub2child in subchild['fvAEPg']['children']:
                                 if 'fvRsPathAtt' in sub2child.keys():
                                     encap=sub2child['fvRsPathAtt']['attributes']['encap']
+                                    encap=str(encap)
+                                    encap=encap.removeprefix("vlan-")
                                     path=sub2child['fvRsPathAtt']['attributes']['tDn']
                                     mode=sub2child['fvRsPathAtt']['attributes']['mode']
                                     if mode == 'regular':
@@ -319,7 +325,7 @@ def get_lag_mode_speed(data,input_pg_name):
     return bundle_policy , speed_policy
 
 
-def get_int_speed (data, node, port):
+def get_int_speed(data, node, port):
     node = int(node)
     interface_profile_tree = get_interface_profile_tree(data)
     nodes_with_interface_profiles = get_nodes_with_interface_profiles(data)
@@ -343,6 +349,350 @@ def get_int_speed (data, node, port):
                         if speed_policy_name == policy['attributes']['name']:
                             speed_policy = policy['attributes']['speed']
     return speed_policy
+
+
+def apstra_port_num (port_mapping_filename,aci_node_id,aci_port_num):
+    with open(port_mapping_filename) as csvfile:
+        reader = csv.DictReader(csvfile)
+        for row in reader:
+            if (row['aci_node_id'] == str(aci_node_id)) & (row['aci_port_num'] == str(aci_port_num)):
+                apstra_port_num = row['apstra_port_num']
+                break
+    return apstra_port_num
+
+
+def get_generic_systems(data, filename):
+    generic_system_single = {}
+    generic_system_pc = {}
+    generic_system_esi = {}
+    vn_to_vlan = {}
+    list_of_node_ids = []
+    for vn in data.keys():
+        try:
+            vn_to_vlan[vn] = data[vn][0]["encap"]
+        except:
+            continue
+    for vn in data.keys():
+        for path in data[vn]:
+            if path["bundle_type"] == "pc":
+                generic_system_pc[path["port_description"]] = path
+            if path["bundle_type"] == "esi":
+                generic_system_esi[path["port_description"]] = path
+            if path["bundle_type"] == "No LAG":
+                generic_system_single[path["port_description"]] = path
+            try:
+                if path["node1"] != "null":
+                    list_of_node_ids.append(path["node1"])
+                if path["node2"] != "null":
+                    list_of_node_ids.append(path["node2"])
+            except:
+                continue
+    list_of_node_ids = set(list_of_node_ids)
+    for vn in data.keys():
+        for path in data[vn]:
+            if path["bundle_type"] == "pc":
+                if path["mode"] == "tagged":
+                    vn_and_mode = str(vn) + "_" + "tagged"
+                if path["mode"] == "untagged":
+                    vn_and_mode = str(vn) + "_" + "untagged"
+                generic_system_pc[path["port_description"]]["vn_tag_list"].extend([vn_and_mode])
+            if path["bundle_type"] == "esi":
+                if path["mode"] == "tagged":
+                    vn_and_mode = str(vn) + "_" + "tagged"
+                if path["mode"] == "untagged":
+                    vn_and_mode = str(vn) + "_" + "untagged"
+                generic_system_esi[path["port_description"]]["vn_tag_list"].extend([vn_and_mode])
+            if path["bundle_type"] == "No LAG":
+                if path["mode"] == "tagged":
+                    vn_and_mode = str(vn) + "_" + "tagged"
+                if path["mode"] == "untagged":
+                    vn_and_mode = str(vn) + "_" + "untagged"
+                generic_system_single[path["port_description"]]["vn_tag_list"].extend([vn_and_mode])
+    for path in generic_system_esi.keys():
+        list_aci_node1_ports = generic_system_esi[path]['node1_ports']
+        list_aci_node2_ports = generic_system_esi[path]['node2_ports']
+        vn_tag_list = generic_system_esi[path]['vn_tag_list']
+        vn_tag_list = json.dumps(vn_tag_list)
+        generic_system_esi[path]['vn_tag_list'] = vn_tag_list
+        if list_aci_node1_ports != "null":
+            list_apstra_node1_ports = []
+            for port in list_aci_node1_ports:
+                apstra_port = apstra_port_num(filename, generic_system_esi[path]['node1'], port)
+                list_apstra_node1_ports.append(apstra_port)
+            generic_system_esi[path]['node1_ports'] = list_apstra_node1_ports
+        if list_aci_node2_ports != "null":
+            list_apstra_node2_ports = []
+            for port in list_aci_node2_ports:
+                apstra_port = apstra_port_num(filename, generic_system_esi[path]['node2'], port)
+                list_apstra_node2_ports.append(apstra_port)
+            generic_system_esi[path]['node2_ports'] = list_apstra_node2_ports
+    for path in generic_system_pc.keys():
+        list_aci_node1_ports = generic_system_pc[path]['node1_ports']
+        vn_tag_list = generic_system_pc[path]['vn_tag_list']
+        vn_tag_list = json.dumps(vn_tag_list)
+        generic_system_pc[path]['vn_tag_list'] = vn_tag_list
+        if list_aci_node1_ports != "null":
+            list_apstra_node1_ports = []
+            for port in list_aci_node1_ports:
+                apstra_port = apstra_port_num(filename, generic_system_pc[path]['node1'], port)
+                list_apstra_node1_ports.append(apstra_port)
+            generic_system_pc[path]['node1_ports'] = list_apstra_node1_ports
+    for path in generic_system_single.keys():
+        list_aci_node1_ports = generic_system_single[path]['node1_ports']
+        vn_tag_list = generic_system_single[path]['vn_tag_list']
+        vn_tag_list = json.dumps(vn_tag_list)
+        generic_system_single[path]['vn_tag_list'] = vn_tag_list
+        if list_aci_node1_ports != "null":
+            list_apstra_node1_ports = []
+            for port in list_aci_node1_ports:
+                apstra_port = apstra_port_num(filename, generic_system_single[path]['node1'], port)
+                list_apstra_node1_ports.append(apstra_port)
+            generic_system_single[path]['node1_ports'] = list_apstra_node1_ports
+
+    return generic_system_single, generic_system_pc, generic_system_esi, vn_to_vlan, list_of_node_ids
+
+
+def get_generic_systems_nb(data, filename):
+    generic_system_single = {}
+    generic_system_pc = {}
+    generic_system_esi = {}
+    vn_to_vlan = {}
+    list_of_node_ids = []
+    for vn in data.keys():
+        try:
+            vn_to_vlan[vn] = data[vn][0]["encap"]
+        except:
+            continue
+    for vn in data.keys():
+        for path in data[vn]:
+            if path["bundle_type"] == "pc":
+                generic_system_pc[path["port_description"]] = path
+            if path["bundle_type"] == "esi":
+                generic_system_esi[path["port_description"]] = path
+            if path["bundle_type"] == "No LAG":
+                generic_system_single[path["port_description"]] = path
+            try:
+                if path["node1"] != "null":
+                    list_of_node_ids.append(path["node1"])
+                if path["node2"] != "null":
+                    list_of_node_ids.append(path["node2"])
+            except:
+                continue
+    list_of_node_ids = set(list_of_node_ids)
+    for vn in data.keys():
+        for path in data[vn]:
+            if path["bundle_type"] == "pc":
+                if path["mode"] == "tagged":
+                    vn_and_mode = str(vn) + "_" + "tagged"
+                if path["mode"] == "untagged":
+                    vn_and_mode = str(vn) + "_" + "untagged"
+                generic_system_pc[path["port_description"]]["vn_tag_list"].extend([vn_and_mode])
+            if path["bundle_type"] == "esi":
+                if path["mode"] == "tagged":
+                    vn_and_mode = str(vn) + "_" + "tagged"
+                if path["mode"] == "untagged":
+                    vn_and_mode = str(vn) + "_" + "untagged"
+                generic_system_esi[path["port_description"]]["vn_tag_list"].extend([vn_and_mode])
+            if path["bundle_type"] == "No LAG":
+                if path["mode"] == "tagged":
+                    vn_and_mode = str(vn) + "_" + "tagged"
+                if path["mode"] == "untagged":
+                    vn_and_mode = str(vn) + "_" + "untagged"
+                generic_system_single[path["port_description"]]["vn_tag_list"].extend([vn_and_mode])
+    for path in generic_system_esi.keys():
+        list_aci_node1_ports = generic_system_esi[path]['node1_ports']
+        list_aci_node2_ports = generic_system_esi[path]['node2_ports']
+        vn_tag_list = generic_system_esi[path]['vn_tag_list']
+        vn_tag_list = json.dumps(vn_tag_list)
+        generic_system_esi[path]['vn_tag_list'] = vn_tag_list
+        if list_aci_node1_ports != "null":
+            list_apstra_node1_ports = []
+            for port in list_aci_node1_ports:
+                apstra_port = "Ethernet1/" + str(port)
+                list_apstra_node1_ports.append(apstra_port)
+            generic_system_esi[path]['node1_ports'] = list_apstra_node1_ports
+        if list_aci_node2_ports != "null":
+            list_apstra_node2_ports = []
+            for port in list_aci_node2_ports:
+                apstra_port = "Ethernet1/" + str(port)
+                list_apstra_node2_ports.append(apstra_port)
+            generic_system_esi[path]['node2_ports'] = list_apstra_node2_ports
+    for path in generic_system_pc.keys():
+        list_aci_node1_ports = generic_system_pc[path]['node1_ports']
+        vn_tag_list = generic_system_pc[path]['vn_tag_list']
+        vn_tag_list = json.dumps(vn_tag_list)
+        generic_system_pc[path]['vn_tag_list'] = vn_tag_list
+        if list_aci_node1_ports != "null":
+            list_apstra_node1_ports = []
+            for port in list_aci_node1_ports:
+                apstra_port = "Ethernet1/" + str(port)
+                list_apstra_node1_ports.append(apstra_port)
+            generic_system_pc[path]['node1_ports'] = list_apstra_node1_ports
+    for path in generic_system_single.keys():
+        list_aci_node1_ports = generic_system_single[path]['node1_ports']
+        vn_tag_list = generic_system_single[path]['vn_tag_list']
+        vn_tag_list = json.dumps(vn_tag_list)
+        generic_system_single[path]['vn_tag_list'] = vn_tag_list
+        if list_aci_node1_ports != "null":
+            list_apstra_node1_ports = []
+            for port in list_aci_node1_ports:
+                apstra_port = "Ethernet1/" + str(port)
+                list_apstra_node1_ports.append(apstra_port)
+            generic_system_single[path]['node1_ports'] = list_apstra_node1_ports
+
+    return generic_system_single, generic_system_pc, generic_system_esi, vn_to_vlan, list_of_node_ids
+
+def aci_fabric_discover(data, fnvread_file_path):
+    aci_leaf_nodes = []
+    aci_leaf_ids = []
+    aci_spine_nodes = []
+    aci_spine_ids = []
+    aci_leaf = {}
+    aci_spine = {}
+    spine_models = []
+    leaf_models = []
+    logical_device = {}
+    logical_devices = []
+    i = 0
+    with open(fnvread_file_path) as csvfile:
+        reader = csv.DictReader(csvfile)
+        for row in reader:
+            if row['nodeRole'] == "3":
+                i = i + 1
+                label = "spine" + str(i)
+                aci_spine['id'] = row['id']
+                aci_spine['model'] = row['model']
+                aci_spine['fabricId'] = row['fabricId']
+                aci_spine['podId'] = row['podId']
+                aci_spine['label'] = label
+                aci_spine_nodes.append(aci_spine.copy())
+                aci_spine_ids.append(row['id'])
+            if row['nodeRole'] == "2":
+                aci_leaf['id'] = row['id']
+                aci_leaf['model'] = row['model']
+                aci_leaf['fabricId'] = row['fabricId']
+                aci_leaf['podId'] = row['podId']
+                aci_leaf_nodes.append(aci_leaf.copy())
+                aci_leaf_ids.append(row['id'])
+    for spine in aci_spine_nodes:
+        spine_models.append(spine['model'])
+    for leaf in aci_leaf_nodes:
+        leaf_models.append(leaf['model'])
+    spine_models = list(set(spine_models))
+    leaf_models = list(set(leaf_models))
+    for model in leaf_models:
+        with open("./cisco_device_profiles/cisco_device_models.csv") as csvfile:
+            reader = csv.DictReader(csvfile)
+            for row in reader:
+                if row['cisco_model'] == model:
+                    logical_device['name'] = "LD_" + model
+                    logical_device['model'] = model
+                    logical_device['device_profile'] = row['device_profile']
+                    logical_device['panel_1_count'] = int(row['panel_1_count'])
+                    logical_device['panel_1_speed'] = row['panel_1_speed']
+                    logical_device['panel_2_count'] = int(row['panel_2_count'])
+                    logical_device['panel_2_speed'] = row['panel_2_speed']
+                    logical_device['panel_3_count'] = int(row['panel_3_count'])
+                    logical_device['panel_3_speed'] = row['panel_3_speed']
+                    logical_device['panel_4_count'] = int(row['panel_4_count'])
+                    logical_device['panel_4_speed'] = row['panel_4_speed']
+                    logical_device['panel_5_count'] = int(row['panel_5_count'])
+                    logical_device['panel_5_speed'] = row['panel_5_speed']
+                    logical_device['panel_6_count'] = int(row['panel_6_count'])
+                    logical_device['panel_6_speed'] = row['panel_6_speed']
+                    logical_device['panel_7_count'] = int(row['panel_7_count'])
+                    logical_device['panel_7_speed'] = row['panel_7_speed']
+                    logical_device['panel_8_count'] = int(row['panel_8_count'])
+                    logical_device['panel_8_speed'] = row['panel_8_speed']
+                    logical_devices.append(logical_device.copy())
+    for model in spine_models:
+        with open("./cisco_device_profiles/cisco_device_models.csv") as csvfile:
+            reader = csv.DictReader(csvfile)
+            for row in reader:
+                if row['cisco_model'] == model:
+                    logical_device['name'] = "LD_" + model
+                    logical_device['model'] = model
+                    logical_device['device_profile'] = row['device_profile']
+                    logical_device['panel_1_count'] = int(row['panel_1_count'])
+                    logical_device['panel_1_speed'] = row['panel_1_speed']
+                    logical_device['panel_2_count'] = int(row['panel_2_count'])
+                    logical_device['panel_2_speed'] = row['panel_2_speed']
+                    logical_device['panel_3_count'] = int(row['panel_3_count'])
+                    logical_device['panel_3_speed'] = row['panel_3_speed']
+                    logical_device['panel_4_count'] = int(row['panel_4_count'])
+                    logical_device['panel_4_speed'] = row['panel_4_speed']
+                    logical_device['panel_5_count'] = int(row['panel_5_count'])
+                    logical_device['panel_5_speed'] = row['panel_5_speed']
+                    logical_device['panel_6_count'] = int(row['panel_6_count'])
+                    logical_device['panel_6_speed'] = row['panel_6_speed']
+                    logical_device['panel_7_count'] = int(row['panel_7_count'])
+                    logical_device['panel_7_speed'] = row['panel_7_speed']
+                    logical_device['panel_8_count'] = int(row['panel_8_count'])
+                    logical_device['panel_8_speed'] = row['panel_8_speed']
+                    logical_devices.append(logical_device.copy())
+    vpc_domains = search_json(data, 'fabricExplicitGEp')
+    fabric_policy = search_json(data, 'fabricSetupPol')
+    for child in fabric_policy:
+        for subchild in child['children']:
+            if 'fabricSetupP' in subchild:
+                tep_pool = subchild['fabricSetupP']['attributes']['tepPool']
+    #tep_pool = fabric_policy['attributes']['tepPool']
+    list_of_leaf_pairs = []
+    list_of_single_leaf = []
+    single_leaf_dict = {}
+    list_of_leaf_pairs_ids = []
+    leaf_pair_dict = {}
+    for path in vpc_domains:
+        node_pair = []
+        for child in path['children']:
+            if "fabricNodePEp" in child.keys():
+                node_pair.append(int(child['fabricNodePEp']['attributes']['id']))
+                list_of_leaf_pairs_ids.append(child['fabricNodePEp']['attributes']['id'])
+        node_pair.sort()
+        leaf_pair_dict['node1'] = str(node_pair[0])
+        leaf_pair_dict['node2'] = str(node_pair[1])
+        for leaf in aci_leaf_nodes:
+            if leaf['id'] == leaf_pair_dict['node1']:
+                leaf_pair_dict['model'] = leaf['model']
+                leaf_pair_dict['fabricId'] = leaf['fabricId']
+                leaf_pair_dict['podId'] = leaf['podId']
+        for device in logical_devices:
+            if device['model'] == leaf_pair_dict['model']:
+                #if device['model'] == "N9K-C9348GC-FXP":
+                if device['panel_3_speed'] != "0":
+                    leaf_pair_dict['spine_link_speed'] = device['panel_3_speed']
+                elif device['panel_2_speed'] != "0":
+                    leaf_pair_dict['spine_link_speed'] = device['panel_2_speed']
+                else:
+                    leaf_pair_dict['spine_link_speed'] = device['panel_1_speed']
+        list_of_leaf_pairs.append(leaf_pair_dict.copy())
+    for id in aci_leaf_ids:
+        if id not in list_of_leaf_pairs_ids:
+            single_leaf_dict['id'] = id
+            for leaf in aci_leaf_nodes:
+                if id == leaf['id']:
+                    single_leaf_dict['model'] = leaf['model']
+                    single_leaf_dict['fabricId'] = leaf['fabricId']
+                    single_leaf_dict['podId'] = leaf['podId']
+                    for device in logical_devices:
+                        if device['model'] == single_leaf_dict['model']:
+                            #if device['model'] == "N9K-C9348GC-FXP":
+                            if device['panel_3_speed'] != "0":
+                                single_leaf_dict['spine_link_speed'] = device['panel_3_speed']
+                            elif device['panel_2_speed'] != "0":
+                                single_leaf_dict['spine_link_speed'] = device['panel_2_speed']
+                            else:
+                                single_leaf_dict['spine_link_speed'] = device['panel_1_speed']
+            list_of_single_leaf.append(single_leaf_dict.copy())
+    return logical_devices, aci_spine_nodes, list_of_single_leaf, list_of_leaf_pairs, tep_pool
+
+
+
+
+
+
+
+
 
 
 
