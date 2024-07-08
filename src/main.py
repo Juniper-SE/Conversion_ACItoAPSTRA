@@ -5,6 +5,7 @@ import utils
 import json
 import logging
 import argparse
+import sys
 
 # Set up logging configuration
 logging.basicConfig(
@@ -74,8 +75,8 @@ def main():
     """Main function to load data and perform tenant search."""
     parser = argparse.ArgumentParser(description="ACI to Apstra Converter")
     parser.add_argument('--file', '-f', type=str, required=True, help='Path to the APIC configuration JSON file')
-    parser.add_argument('--port_file', '-p', type=str, required=True, help='Path to the ACI to Apstra fabric port mapping CSV file')
-    parser.add_argument('--blueprint_name', '-b', type=str, required=True, help='Blueprint ID needed for Terraform Config file.')
+    parser.add_argument('--port_file', '-p', type=str, required=('-n' or '--new')not in sys.argv, help='Path to the ACI to Apstra fabric port mapping CSV file')
+    parser.add_argument('--blueprint_name', '-b', type=str, required=True, help='Blueprint Name needed for Terraform Config file.')
     parser.add_argument('--new', '-n', action='store_true', help='Create a new blueprint on Apstra based on the current ACI topology / switches.')
     parser.add_argument('--output', '-o', type=str, required=True, help='Output directory for Terraform Config file.')
     parser.add_argument('--test', '-t', action='store_true', help='Run the script in test mode')

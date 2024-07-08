@@ -581,7 +581,7 @@ def aci_fabric_discover(data, fnvread_file_path):
     spine_models = list(set(spine_models))
     leaf_models = list(set(leaf_models))
     for model in leaf_models:
-        with open("./cisco_device_profiles/cisco_device_models.csv") as csvfile:
+        with open("./src/cisco_device_profiles/cisco_device_models.csv") as csvfile:
             reader = csv.DictReader(csvfile)
             for row in reader:
                 if row['cisco_model'] == model:
@@ -606,7 +606,7 @@ def aci_fabric_discover(data, fnvread_file_path):
                     logical_device['panel_8_speed'] = row['panel_8_speed']
                     logical_devices.append(logical_device.copy())
     for model in spine_models:
-        with open("./cisco_device_profiles/cisco_device_models.csv") as csvfile:
+        with open("./src/cisco_device_profiles/cisco_device_models.csv") as csvfile:
             reader = csv.DictReader(csvfile)
             for row in reader:
                 if row['cisco_model'] == model:
