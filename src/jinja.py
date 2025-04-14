@@ -142,7 +142,7 @@ def generate_apstra_datacenter_virtual_network_nb_config(data, vn_to_vlan):
       ipv4_virtual_gateway         = "{{sub_item.apstra_ip}}"
       ipv4_subnet                  = "{{sub_item.apstra_network}}"
       {%- endfor %}
-      {%- if 'mgmt_inb' in item.vn_name or 'infra_default' in item.vn_name or 'infra_ave-ctrl' in item.vn_name  %}
+      {%- if 'mgmt_inb' in item.vn_name or 'infra_default' in item.vn_name or 'infra_ave-ctrl' in item.vn_name or item.vn_name not in vn_to_vlan.keys() %}
       bindings = data.apstra_datacenter_virtual_network_binding_constructor.binder_default.bindings
       {%- else %}
       reserve_vlan                 = true

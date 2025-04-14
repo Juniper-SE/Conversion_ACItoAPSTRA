@@ -5,22 +5,24 @@ import json
 
 def search_json(data, keys_to_find, path=""):
     results = []
-
+    if isinstance(keys_to_find,list):
+        key_in_search=str(keys_to_find[0])
+    elif isinstance(keys_to_find,str):
+        key_in_search=keys_to_find
     if isinstance(data, dict):
         for key, value in data.items():
             current_path = f"{path}/{key}" if path else key
-            if key in keys_to_find:
+            if key == key_in_search:
                 results.append({
                     "path": current_path,
                     "attributes": value.get("attributes", []),
-                    "children": value.get("children", []) 
+                    "children": value.get("children", [])
                 })
             results.extend(search_json(value, keys_to_find, current_path))
     elif isinstance(data, list):
         for index, item in enumerate(data):
             current_path = f"{path}[{index}]"
             results.extend(search_json(item, keys_to_find, current_path))
-
     return results
 
 
@@ -95,9 +97,11 @@ def port_binding(aci_bindings, nodes_with_interface_profiles, interface_profile_
                 node1_ports=[]
                 node2_ports=[]
                 for profile in node1_leaf_profiles:
-                    node1_ports.extend(interface_profile_tree[profile][pg])
+                    if pg in interface_profile_tree[profile]:
+                        node1_ports.extend(interface_profile_tree[profile][pg])
                 for profile in node2_leaf_profiles:
-                    node2_ports.extend(interface_profile_tree[profile][pg])
+                    if pg in interface_profile_tree[profile]:
+                        node2_ports.extend(interface_profile_tree[profile][pg])
                 bundle_mode, port_speed = get_lag_mode_speed(data,pg)
                 bundle_mode = 'lacp_' + bundle_mode
                 entry['bundle_type']="esi"
